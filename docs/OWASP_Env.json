@@ -1,0 +1,21 @@
+{
+	"id": "24c1df3e-0959-4dda-bbcd-d3ac96fc1112",
+	"name": "Owasp API Security - Env",
+	"values": [
+		{
+			"key": "base_url",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "admin_url",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment",
+	"_postman_exported_at": "2026-01-29T11:22:00.395Z",
+	"_postman_exported_using": "Postman/11.72.3"
+}

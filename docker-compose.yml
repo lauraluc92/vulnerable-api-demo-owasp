@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  api_vulnerable:
+    build: .
+    container_name: demo_api_vulnerable
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - RESET=True
+    volumes:
+      - ./vuln.db:/app/sql_app.db
+
+  api_secure:
+    build: .
+    container_name: demo_api_secure
+    command: uvicorn app_secure.main:app --host 0.0.0.0 --port 8001
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      - RESET=True
+    
+    volumes:
+      - ./secure.db:/app/sql_app.db
