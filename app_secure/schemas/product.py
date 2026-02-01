@@ -46,6 +46,5 @@ class ProductReportCreate(BaseModel):
 
 class ProductReportResponse(BaseModel):
     reporter: str
-    reporter_id: int
     reason: str
     timestamp: datetime

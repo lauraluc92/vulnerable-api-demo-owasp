@@ -79,9 +79,7 @@ def report_product(
         reason=report_data.reason
     )
     return {
-        "id": report.id,
         "reporter": current_user.username, 
-        "reporter_id": current_user.id,
         "reason": report.reason,
         "timestamp": report.timestamp
     }
