@@ -1019,7 +1019,7 @@ def read_user_by_id(user_id: int, db: Session = Depends(get_db)):
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
-    # Retourne uniquement username et id, pas l'email
+    # Retourne uniquement username, pas l'email
 ```
 
 L'ID n'est plus exposé dans l'URL pour l'endpoint /me, qui renvoie des informations sensibles sur l'utilisateur qui est actuellement connecté. Son ID est extrait du token JWT. 
