@@ -54,6 +54,8 @@ Vous incarnez **"Badguy"** (ID: 666), un vendeur malhonnête sur la plateforme.
 ### Prérequis
 
 - Postman installé (version desktop recommandée)
+  - *Windows / Mac :* Télécharger sur le [site officiel](https://www.postman.com/downloads/).
+  - *Linux :* Via le terminal avec la commande : `sudo snap install postman`
 - Les deux APIs lancées en local :
   - API vulnérable : port 8000
   - API sécurisée : port 8001
