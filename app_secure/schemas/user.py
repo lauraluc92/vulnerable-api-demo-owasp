@@ -42,7 +42,6 @@ class UserResponse(BaseModel):
 
 
 class UserPublic(BaseModel):
-    id: int
     username: str    
     class Config:
         from_attributes = True
