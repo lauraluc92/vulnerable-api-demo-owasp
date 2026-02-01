@@ -42,7 +42,7 @@ Clonez le projet sur votre ordinateur :
 ```bash
 git clone https://github.com/lauraluc92/vulnerable-api-demo-owasp.git
 ```
-e
+
 Ouvrez un terminal à la racine du projet et lancez :
 
 ```bash
