@@ -1,4 +1,4 @@
-# Vulnerable API Demonstrator
+# OWASP Vulnerable API Demonstrator
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi&logoColor=white)
@@ -37,9 +37,16 @@ La méthode recommandée est d'utiliser Docker Compose. Cela lance les deux APIs
 
 ### 1. Lancer l'application
 
+Clonez le projet sur votre ordinateur :
+
+```bash
+git clone https://github.com/lauraluc92/vulnerable-api-demo-owasp.git
+```
+e
 Ouvrez un terminal à la racine du projet et lancez :
 
 ```bash
+cd vulnerable-api-demo-owasp
 # Construire et lancer les conteneurs en arrière-plan
 sudo docker compose up -d --build
 ```
