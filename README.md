@@ -29,6 +29,8 @@ Il met en œuvre deux versions d'une même API e-commerce :
 
 * **docs/** : Contient le guide d'attaque, la collection Postman et l'environnement Postman.
 
+* **attack/** : Contient un fichier utilisé lors du scénario d'attaque sur Postman, dans la phase 4, à propos de la configuration CORS.
+
 ---
 
 ## Installation et Lancement (Docker)

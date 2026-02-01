@@ -1957,7 +1957,7 @@ app.add_middleware(
 **Note technique :** Quand `allow_credentials=True`, le standard CORS interdit de renvoyer littéralement `*`. Le framework contourne cela en reflétant dynamiquement l'origine de la requête, ce qui revient au même problème de sécurité.
 
 Ayant découvert cette vulnérabilité cruciale, l'attaquant passe à l'action. Il envoie un email de phishing à l'administrateur ciblé, l'incitant à cliquer sur un lien vers une page piégée. Lorsque l'administrateur clique, son navigateur charge la page malveillante. 
-Pour simuler l'administrateur qui se fait piéger, cliquez sur le fichier attack/api8_cors_attacks.html.
+Pour simuler le piège tendu à l'administrateur, ouvrez simplement le fichier attack/api8_cors_attacks.html dans votre navigateur (double-clic). En ouvrant ce fichier localement, votre navigateur effectue la requête depuis la machine hôte (127.0.0.1). L'API considère donc que la requête provient du réseau interne de confiance, ce qui permet de contourner le pare-feu IP (simulé) et de valider le scénario d'attaque.
 
 Un script JavaScript s'exécute alors en arrière-plan :
     - Il effectue une requête GET /admin/stats vers l'API. Comme l'administrateur est connecté au réseau interne, le pare-feu laisse passer la requête. Comme il est authentifié, ses cookies sont envoyés.
@@ -2289,6 +2289,27 @@ Si vous souhaitez tester que les corrections mises en place fonctionnent bien, v
 ### Endpoints supprimés ou modifiés
 
 Certains endpoints n'existent plus dans l'API sécurisée, comme `GET {{base_url}}/orders/user/{id}` (remplacé par un endpoint `/me`), ou bien `GET {{base_url}}/openapi.json` (plus accessible). Vous obtiendrez alors la réponse **404 Not Found**.
+
+### Vérification de la protection CORS (API8)
+
+Par défaut, le script d'attaque attacks/api8_cors_attacks.html vise l'API vulnérable (Port 8000) et l'attaque réussit (les données s'affichent).
+
+Pour vérifier que la version sécurisée bloque bien cette attaque, vous devez modifier la cible dans le fichier HTML :
+
+    Ouvrez le fichier attacks/api8_cors_attacks.html dans un éditeur de texte.
+
+    Modifiez la variable PORT pour viser l'API sécurisée :
+    JavaScript
+
+    // Avant (Vulnérable)
+    const PORT = '8000';
+
+    // Après (Sécurisé)
+    const PORT = '8001';
+
+    Ouvrez le fichier dans votre navigateur.
+
+    Résultat attendu : Aucune donnée ne s'affiche. En ouvrant la console du navigateur (F12), vous verrez une erreur rouge, confirmant que la protection est active. Un 404 Not Found est également présent car l'endpoint visé est /admin/stats au lieu de /management-7f8a9d1c-3b2e-4a1f pour l'API sécurisée.
 
 ### Requêtes admin (6.1 à 6.6)
 
