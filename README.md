@@ -114,17 +114,12 @@ pip install -r requirements.txt
 ### 2. Lancer l'API Vulnérable
 
 ```bash
-# Créez un fichier .env à la racine avec : RESET=True
 uvicorn app.main:app --reload --port 8000
 ```
 
 ### 3. Lancer l'API Sécurisée
 
 ```bash
-# Définir l'URL admin secrète
-export SECRET_ADMIN_URL="/management-7f8a9d1c"
-
-# Lancer le serveur
 uvicorn app_secure.main:app --reload --port 8001
 ```
 
