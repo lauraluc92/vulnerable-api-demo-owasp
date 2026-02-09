@@ -1223,14 +1223,21 @@ Code vulnérable typique :
 ```python
 @router.patch("/products/{product_id}")
 def update_product(product_id: int, product_update: dict, ...):
-    product = db.query(Product).filter(Product.id == product_id).first()
-    
-    # Mise à jour aveugle : tous les champs du dict sont appliqués
-    for key, value in product_update.items():
-        setattr(product, key, value)
-    
+    product = get_product_by_id(db, product_id=product_id)
+    if product is None:
+        # Code dans le Cas None
+    updated_product = update_product_vulnerable(db, product, product_update)
+    return updated_product
+
+# Fonction dans CRUD updated_product
+def update_product_vulnerable(db: Session, db_product: Product, product_update: ProductUpdateVulnerable) -> Product:
+    update_data = product_update.model_dump(exclude_unset=True) 
+    for key, value in update_data.items():
+        setattr(db_product, key, value)
+    db.add(db_product)
     db.commit()
-    return product
+    db.refresh(db_product)
+    return db_product
 ```
 
 **Mesure de sécurité : Schéma Pydantic strict**
@@ -1246,26 +1253,28 @@ class ProductUpdateSecure(BaseModel):
 
 **2. Utiliser ce schéma dans l'endpoint :**
 ```python
-@router.patch("/products/{product_id}")
+# Utilisation de ProductResponseSecure pour l'API
+@router.patch("/products/{product_id}", response_model=ProductResponseSecure, tags=["Products"])
 def update_product(
-    product_id: int,
-    product_update: ProductUpdateSecure,  # Schéma strict
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    product_id: int, 
+    product_update: ProductUpdateSecure,
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
 ):
-    product = db.query(Product).filter(Product.id == product_id).first()
-    
-    # Vérification : l'utilisateur est-il le vendeur ?
-    if product.seller_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not your product")
-    
-    # Mise à jour UNIQUEMENT des champs autorisés
+    product = get_product_by_id(db, product_id=product_id)
+    #...
+    return updated_product
+
+# Et aussi dans la fonction CRUD (grâce aux arguments)
+def update_product_secure(db: Session, db_product: Product, product_update: ProductUpdateSecure):
+    #update uniquement champs envoyés par l'utilisateur
     update_data = product_update.dict(exclude_unset=True)
     for key, value in update_data.items():
-        setattr(product, key, value)
-    
+        setattr(db_product, key, value)
+    db.add(db_product)
     db.commit()
-    return product
+    db.refresh(db_product)
+    return db_product
 ```
 
 **Résultat :** Si l'attaquant tente d'envoyer `{"blocked": false}`, FastAPI ignore ce champ ou retourne une erreur de validation. La propriété `blocked` reste protégée et ne peut être modifiée que par un endpoint administratif dédié.
@@ -1380,7 +1389,7 @@ Le premier achat fonctionne. On essaie une deuxième fois de lancer cette requê
 
 ---
 
-#### Request 5.3 : Create second account
+#### Request 5.3 : Trying to create first account
 
 **Requête :**
 ```
@@ -1388,10 +1397,10 @@ POST {{base_url}}/auth/register
 ```
 
 **Objectif :**
-Créer un deuxième compte pour contourner le quota.
+Créer un compte pour contourner le quota.
 
 **Action dans Postman :**
-1. Sélectionner la requête "Request 5.3 : Create second account"
+1. Sélectionner la requête "Request 5.3 : Trying to create first account"
 2. Examiner le corps de la requête
 3. Cliquer sur "Send"
 
@@ -1421,7 +1430,7 @@ POST {{base_url}}/auth/register
 ```
 
 **Objectif :**
-Tenter de créer rapidement un troisième compte.
+Tenter de créer rapidement un deuxième compte.
 
 **Action dans Postman :**
 1. Sélectionner la requête 5.4
@@ -1440,7 +1449,7 @@ Tenter de créer rapidement un troisième compte.
 
 ---
 
-#### Request 5.5 : Test with fake IP
+#### Request 5.5 : Bot1 - Create account
 
 **Requête :**
 ```
@@ -1451,7 +1460,7 @@ POST {{base_url}}/auth/register
 Contourner le rate limiting en utilisant une autre adresse IP. Ici, nous n'avons pas d'autre IP à disposition, nous utilisons donc un faux header IP. Nous avons implémenté l'API de sorte à ce qu'elle pense que le header IP est la réelle adresse IP, afin de mener à bien cette attaque. En réalité, il n'est pas possible de changer son adresse IP de la sorte.
 
 **Action dans Postman :**
-1. Sélectionner la requête "Request 5.5 : Test with fake IP"
+1. Sélectionner la requête "Request 5.5 : Bot1 - Create account"
 2. Ouvrir l'onglet "Headers"
 3. Remarquez le header `X-Forwarded-For: 192.168.1.100`
 4. Cliquer sur "Send"
@@ -2266,7 +2275,7 @@ class UserUpdateSecure(BaseModel):
     # Le champ 'blocked' est ABSENT = non modifiable par les utilisateurs
 ```
 
-**Résultat :** Toute tentative d'injection du champ `blocked` est automatiquement ignorée par FastAPI. Seul un endpoint administratif dédié peut modifier ce champ.
+**Résultat :** Toute tentative d'injection du champ `blocked` est automatiquement interdite par FastAPI. Seul un endpoint administratif dédié peut modifier ce champ.
 
 ---
 
