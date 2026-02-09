@@ -99,7 +99,7 @@ def populate_db(db: Session):
         description="The console everyone wants. Ultra-limited stock!",
         seller_id=admin_user.id,
         blocked=False,
-        stock=11)
+        stock=21)
     db.add(star_product)
     created_products.append(star_product)
 

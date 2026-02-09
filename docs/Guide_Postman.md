@@ -56,6 +56,9 @@ Vous incarnez **"Badguy"** (ID: 666), un vendeur malhonnête sur la plateforme.
 - Postman installé (version desktop recommandée)
   - *Windows / Mac :* Télécharger sur le [site officiel](https://www.postman.com/downloads/).
   - *Linux :* Via le terminal avec la commande : `sudo snap install postman`
+- Créez vous un compte Free Plan sur Postman, ou connectez-vous à l'aide des services proposés.
+Passez l'étape mentionnant une "Team" et lorsque l'agent Postman IA apparait, entrez le prompt :
+"I want to import and manage my existing API in Postman".
 - Les deux APIs lancées en local :
   - API vulnérable : port 8000
   - API sécurisée : port 8001
@@ -67,20 +70,27 @@ Vous incarnez **"Badguy"** (ID: 666), un vendeur malhonnête sur la plateforme.
 #### 1. Importer la collection
 
 Dans Postman :
+A côté de "user's Workspace", cliquez sur le bouton "Import" (qui se situe à côté de New)
 ```
-File → Import → Sélectionner OWASP_Collection.json
+Import → Sélectionner OWASP_Collection.json
 ```
 
 #### 2. Configurer l'environnement
 
 Dans Postman :
+Cliquez sur le même bouton "Import" qu'à l'étape précédente.
 ```
-File → Import → Sélectionner OWASP_Env.json
+Import → Sélectionner OWASP_Env.json
 ```
-- Sélectionner **"Owasp API Security - Env"** dans le menu déroulant en haut à droite
+- Sélectionner **"Owasp API Security - Env"** dans le menu déroulant en haut à droite, où il est écrit à l'origine "No environment"
+- Cliquez sur Environments tout à gauche.
 - Vérifier la variable `base_url` :
   - Pour l'API vulnérable : `http://localhost:8000`
   - Pour l'API sécurisée : `http://localhost:8001`
+
+On commence dans le scénario par tester l'API vulnérable. Si `base_url` est vide, remplissez la avec `http://localhost:8000`. La variable `admin_url` sera remplie plus tard.
+
+Revenez sur Collections (où s'affichent les requêtes).
 
 #### 3. Activer la Console
 
@@ -235,7 +245,7 @@ La réponse JSON contient l'intégralité de la structure de l'API. Regardez not
 
 **Script de test automatique :**
 
-Ouvrez l'onglet "Tests" de cette requête dans Postman. Le script vérifie automatiquement la présence de routes admin :
+Ouvrez l'onglet "Scripts" de cette requête dans Postman. Le script vérifie automatiquement la présence de routes admin :
 
 ```javascript
 pm.test("Vulnerability confirmed : admin routes exposed", function() {
@@ -292,11 +302,11 @@ Cette requête utilise un script Post-Response qui teste automatiquement une lis
 
 **Action dans Postman :**
 1. Sélectionner la requête "Request 1.3 : Fuzzing"
-2. Ouvrir l'onglet "Tests" pour voir le code
+2. Ouvrir l'onglet "Scripts" pour voir le code
 3. Cliquer sur "Send"
 4. Ouvrir la Console Postman pour voir les résultats
 
-**Script d'attaque (visible dans l'onglet "Tests") :**
+**Script d'attaque (visible dans l'onglet "Scripts") :**
 
 ```javascript
 const common_endpoints = [
@@ -420,7 +430,7 @@ L'attaquant se connecte légitimement avec son propre compte pour récupérer un
 
 **Script automatique :**
 
-Un script Post-Response sauvegarde automatiquement le token dans les variables d'environnement. Ouvrez l'onglet "Tests" pour voir :
+Un script Post-Response sauvegarde automatiquement le token dans les variables d'environnement. Ouvrez l'onglet "Scripts" pour voir :
 
 ```javascript
 const response = pm.response.json();
@@ -1502,11 +1512,11 @@ Lancer un script automatisé qui crée 20 comptes fictifs, chacun avec une fauss
 
 **Action dans Postman :**
 1. Sélectionner la requête "Request 5.8 : Launch Scalper Attack"
-2. Ouvrir l'onglet "Tests" pour voir le script
+2. Ouvrir l'onglet "Scripts" pour voir le script
 3. Ouvrir la Console Postman
 4. Cliquer sur "Send"
 
-**Script d'attaque (visible dans l'onglet "Tests")**
+**Script d'attaque (visible dans l'onglet "Scripts")**
 
 **Résultats à lire dans la Console Postman**
 
@@ -2063,7 +2073,7 @@ Récupérer la liste de tous les utilisateurs pour identifier les cibles du dén
 Authorization: Bearer {{attacker_token}}
 ```
 
-**Script Post-Response (visible dans l'onglet "Tests") :**
+**Script Post-Response (visible dans l'onglet "Scripts") :**
 
 ```javascript
 if (pm.response.code === 200) {
@@ -2185,7 +2195,7 @@ Bloquer massivement tous les utilisateurs de la plateforme (sauf l'attaquant).
 
 **Action dans Postman :**
 1. Sélectionner la requête "Request 8.3 : Block all users"
-2. Ouvrir l'onglet "Tests" pour voir le script d'attaque
+2. Ouvrir l'onglet "Scripts" pour voir le script d'attaque
 3. Ouvrir la Console Postman et la glisser vers le haut pour bien voir les résultats
 4. Cliquer sur "Send"
 
@@ -2194,7 +2204,7 @@ Bloquer massivement tous les utilisateurs de la plateforme (sauf l'attaquant).
 Authorization: Bearer {{attacker_token}}
 ```
 
-**Script d'attaque automatisée (visible dans l'onglet "Tests")**
+**Script d'attaque automatisée (visible dans l'onglet "Scripts")**
 
 **Fonctionnement du script :**
 
