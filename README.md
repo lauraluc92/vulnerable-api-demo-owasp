@@ -131,5 +131,5 @@ uvicorn app_secure.main:app --reload --port 8001
 
 Projet réalisé dans le cadre du cursus Ingénieur Cybersécurité.
 
-* Zoé KIEKEN
 * Laura LUC
+* Zoé KIEKEN
